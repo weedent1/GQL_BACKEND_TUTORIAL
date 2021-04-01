@@ -1,3 +1,10 @@
+const Query = require('./resolvers/Query')
+const Mutation = require('./resolvers/Mutation')
+const User = require('./resolvers/User')
+const Link = require('./resolvers/Link')
+
+const { getUserId } = require('./utils');
+const { PrismaClient } = require('@prisma/client')
 const { ApolloServer } = require('apollo-server');
 const fs = require('fs');
 const path = require('path');
@@ -20,50 +27,65 @@ const path = require('path');
 //   }
 // `
 
-let links = [
-    {
-        id: 'link-0',
-        url: 'www.matc.edu',
-        description: 'Milwaukee Area Technical College'
-    },
-    {
-        id: 'link-1',
-        url: 'www.matc.edu',
-        description: 'Milwaukee Area Technical College'
-    }
- ]
+// no longer needed after connecting prisma and sqlite db
+// let links = [
+//     {
+//         id: 'link-0',
+//         url: 'www.matc.edu',
+//         description: 'Milwaukee Area Technical College'
+//     },
+//     {
+//         id: 'link-1',
+//         url: 'www.matc.edu',
+//         description: 'Milwaukee Area Technical College'
+//     }
+//  ]
 
- let idCount = links.length;
+//  let idCount = links.length;
 
-const resolvers = {
-  Query: {
-    info: () => `This is the API of a Hackernews Clone`,
-    feed: () => links,
-    link: (parent, args) => links.find((link) => link.id === args.id)
-  },
-  Mutation: {
-      post: (parent, args) => {
-          const link = {
-              id: `link-${idCount++}`,
-              description: args.description,
-              url: args.url,
-          };
-          links.push(link);
-          return link;
-      },
-      updateLink: (parent, args) => {
-        const link = links.find((link) => link.id === args.id);
-        link.url = args.url;
-        link.description = args.description;
-        return link;
-      },
-      deleteLink: (parent, args) => {
-        const linkIndex = links.findIndex((link) => link.id === args.id);
-        const deletedLink = links[linkIndex];
-        links = links.splice(linkIndex, 1);
-        return deletedLink;
-      }
-  },
+// const resolvers = {
+//   Query: {
+//     info: () => `This is the API of a Hackernews Clone`,
+//     feed: async (parent, args, context) => {
+//       return context.prisma.link.findMany()
+//     },
+//     link: (parent, args) => links.find((link) => link.id === args.id)
+//   },
+//   Mutation: {
+//     post: (parent, args, context, info) => {
+//       const newLink = context.prisma.link.create({
+//         data: {
+//           url: args.url,
+//           description: args.description,
+//         },
+//       })
+//       return newLink
+//     },
+  // Mutation: {
+  //     post: (parent, args) => {
+  //         const link = {
+  //             id: `link-${idCount++}`,
+  //             description: args.description,
+  //             url: args.url,
+  //         };
+  //         links.push(link);
+  //         return link;
+  //     },
+
+      // UPDATE THESE TO USE PRISMA not local vairables
+      // updateLink: (parent, args) => {
+      //   const link = links.find((link) => link.id === args.id);
+      //   link.url = args.url;
+      //   link.description = args.description;
+      //   return link;
+      // },
+      // deleteLink: (parent, args) => {
+      //   const linkIndex = links.findIndex((link) => link.id === args.id);
+      //   const deletedLink = links[linkIndex];
+      //   links = links.splice(linkIndex, 1);
+      //   return deletedLink;
+      // }
+  // },
   // You can uncomment the code below but it isnt necessary for the code to run, graphql automaically does the following for us 
   // Uncommenting the code will not cause an error it will simply work the same as this is what gql does under the hood
   
@@ -81,7 +103,17 @@ In any case, because the implementation of the Link resolvers is trivial, you ca
 //       description: (parent) => parent.description,
 //       url: (parent) => parent.url
 //   }
+// }
+
+
+const resolvers = {
+  Query,
+  Mutation,
+  User,
+  Link
 }
+
+const prisma = new PrismaClient()
 
 const server = new ApolloServer({
   typeDefs: fs.readFileSync(
@@ -89,6 +121,16 @@ const server = new ApolloServer({
       'utf8'
   ),
   resolvers,
+  context: ({ req }) => {
+    return {
+    ...req,
+    prisma,
+    userId:
+        req && req.headers.authorization
+          ? getUserId(req)
+          : null
+    }
+  }
 })
 
 server
